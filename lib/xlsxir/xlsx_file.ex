@@ -4,10 +4,10 @@ defmodule Xlsxir.XlsxFile do
 
   ## Example
 
-    iex> xlsx_file = Xlsxir.XlsxFile.initialize("./test/test_data/test.xlsx")
-    iex> {:ok, _tid} = Xlsxir.XlsxFile.parse_to_ets(xlsx_file, 0)
-    iex> Xlsxir.XlsxFile.clean(xlsx_file)
-    :ok
+  iex> xlsx_file = Xlsxir.XlsxFile.initialize("./test/test_data/test.xlsx")
+  iex> {:ok, _tid} = Xlsxir.XlsxFile.parse_to_ets(xlsx_file, 0)
+  iex> Xlsxir.XlsxFile.clean(xlsx_file)
+  :ok
   """
 
   alias Xlsxir.Unzip
@@ -16,26 +16,26 @@ defmodule Xlsxir.XlsxFile do
 
   # list of worksheet %XmlFile{}
   defstruct worksheet_xml_files: [],
-            # shared strings %XmlFile{}
-            shared_strings_xml_file: nil,
-            # styles %XmlFile{}
-            styles_xml_file: nil,
-            # workbook %XmlFile{}
-            workbook_xml_file: nil,
-            # ets table id
-            styles: nil,
-            # ets table id
-            workbook: nil,
-            # ets table id
-            shared_strings: nil,
-            # maximum rows to process during extraction to ETS
-            max_rows: nil,
-            extract_to: nil,
-            extract_dir: nil,
-            options: []
+    # shared strings %XmlFile{}
+    shared_strings_xml_file: nil,
+    # styles %XmlFile{}
+    styles_xml_file: nil,
+    # workbook %XmlFile{}
+    workbook_xml_file: nil,
+    # ets table id
+    styles: nil,
+    # ets table id
+    workbook: nil,
+    # ets table id
+    shared_strings: nil,
+    # maximum rows to process during extraction to ETS
+    max_rows: nil,
+    extract_to: nil,
+    extract_dir: nil,
+    options: []
 
   @default_options extract_to: :memory,
-                   extract_base_dir: nil
+    extract_base_dir: nil
 
   @doc """
   Extract and prepare `.xlsx` file content.
@@ -46,11 +46,11 @@ defmodule Xlsxir.XlsxFile do
   ## Options
   - `:max_rows` - the number of rows to fetch from within the worksheet
   - `:extract_to` - Specify how the `.xlsx` content (i.e. sharedStrings.xml,
-     style.xml and worksheets xml files) will be be extracted before being parsed.
-    `:memory` will extract files to memory, and `:file` to files in the file system
+  style.xml and worksheets xml files) will be be extracted before being parsed.
+  `:memory` will extract files to memory, and `:file` to files in the file system
   - `:extract_base_dir` - when extracting to file, files will be extracted
-     in a sub directory in the `:extract_base_dir` directory. Defaults to
-     `Application.get_env(:xlsxir, :extract_base_dir)` or "temp"
+  in a sub directory in the `:extract_base_dir` directory. Defaults to
+  `Application.get_env(:xlsxir, :extract_base_dir)` or "temp"
   """
   def initialize(xlsx_filepath, options \\ []) do
     options = Keyword.merge(@default_options, options)
@@ -75,7 +75,7 @@ defmodule Xlsxir.XlsxFile do
   def parse_to_ets({:error, _} = error, _worksheet_index_or_file, _timer), do: error
 
   def parse_to_ets(%__MODULE__{} = xlsx_file, worksheet_index, timer)
-      when is_integer(worksheet_index) do
+    when is_integer(worksheet_index) do
     with {:ok, worksheet_xml_file} <- get_worksheet(xlsx_file, worksheet_index) do
       parse_to_ets(xlsx_file, worksheet_xml_file, timer)
     end
@@ -229,20 +229,20 @@ defmodule Xlsxir.XlsxFile do
 
   defp extract_all_xml_files(%__MODULE__{} = xlsx_file, xlsx_filepath) do
     with {:ok, worksheet_indexes} <- Unzip.validate_path_all_indexes(xlsx_filepath),
-         xml_paths_list <- zip_paths_list(worksheet_indexes),
-         {:ok, xml_files} <-
-           Unzip.extract_xml(xml_paths_list, xlsx_filepath, unzip_options(xlsx_file)) do
+      xml_paths_list <- zip_paths_list(worksheet_indexes),
+      {:ok, xml_files} <-
+        Unzip.extract_xml(xml_paths_list, xlsx_filepath, unzip_options(xlsx_file)) do
       %{
         xlsx_file
-        | worksheet_xml_files:
-            xml_files
-            |> Enum.filter(fn %XmlFile{name: name} -> String.starts_with?(name, "sheet") end),
+          | worksheet_xml_files:
+          xml_files
+          |> Enum.filter(fn %XmlFile{name: name} -> String.starts_with?(name, "sheet") end),
           shared_strings_xml_file:
-            xml_files |> Enum.find(fn %XmlFile{name: name} -> name == "sharedStrings.xml" end),
+          xml_files |> Enum.find(fn %XmlFile{name: name} -> name == "sharedStrings.xml" end),
           styles_xml_file:
-            xml_files |> Enum.find(fn %XmlFile{name: name} -> name == "styles.xml" end),
+          xml_files |> Enum.find(fn %XmlFile{name: name} -> name == "styles.xml" end),
           workbook_xml_file:
-            xml_files |> Enum.find(fn %XmlFile{name: name} -> name == "workbook.xml" end)
+          xml_files |> Enum.find(fn %XmlFile{name: name} -> name == "workbook.xml" end)
       }
     end
   end
@@ -293,15 +293,17 @@ defmodule Xlsxir.XlsxFile do
 
   defp parse_shared_strings_to_ets({:error, _} = error), do: error
 
-  defp get_worksheet(%__MODULE__{} = xlsx_file, index) do
-    xml_file =
-      Enum.find(xlsx_file.worksheet_xml_files, fn xml_file ->
-        xml_file.name == "sheet#{index + 1}.xml"
-      end)
 
-    case xml_file do
-      nil -> {:error, "Invalid worksheet index."}
-      %XmlFile{} -> {:ok, xml_file}
+  defp get_worksheet(%__MODULE__{} = xlsx_file, index) do
+    xml_file_path = Path.join(xlsx_file.extract_dir, "sheet#{index + 1}.xml")
+    case File.exists?(xml_file_path) do
+      true ->
+        case File.open!(xml_file_path) do
+          {:ok, _} -> {:ok, %XmlFile{name: "sheet#{index + 1}.xml"}}
+          {:error, reason} -> {:error, "Failed to open worksheet file: #{reason}"}
+        end
+      false ->
+        {:error, "Invalid worksheet index. File not found."}
     end
   end
 
